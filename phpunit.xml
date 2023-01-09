@@ -18,4 +18,8 @@
             <directory>./tests/Storage/Device</directory>
         </testsuite>
     </testsuites>
+    <php>
+      <env name="LINODE_ACCESS_KEY" value="KEY" force="true" />
+      <env name="LINODE_SECRET" value="SECRET" force="true" />
+    </php>
 </phpunit>

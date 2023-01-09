@@ -2,24 +2,24 @@
 
 namespace Utopia\Tests\Storage\Device;
 
-use Utopia\Storage\Device\Wasabi;
+use Utopia\Storage\Device\Contabo;
 use Utopia\Tests\Storage\S3Base;
 
-class WasabiTest extends S3Base
+class ContaboTest extends S3Base
 {
     protected function init(): void
     {
-        $this->root = '/root';
+        $this->root = '';
         $key = $_SERVER['WASABI_ACCESS_KEY'] ?? '';
         $secret = $_SERVER['WASABI_SECRET'] ?? '';
         $bucket = 'utopia-storage-tests';
 
-        $this->object = new Wasabi($this->root, $key, $secret, $bucket, Wasabi::EU_CENTRAL_1, WASABI::ACL_PRIVATE);
+        $this->object = new Contabo($this->root, $key, $secret, $bucket, "default", "");
     }
 
     protected function getAdapterName(): string
     {
-        return 'Wasabi Storage';
+        return 'Contabo Storage';
     }
 
     protected function getAdapterType(): string
@@ -29,6 +29,6 @@ class WasabiTest extends S3Base
 
     protected function getAdapterDescription(): string
     {
-        return 'Wasabi Storage';
+        return 'Contabo Storage';
     }
 }

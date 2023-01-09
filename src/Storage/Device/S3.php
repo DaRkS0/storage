@@ -86,6 +86,11 @@ class S3 extends Device
     protected string $root = 'temp';
 
     /**
+     * @var bool
+     */
+    protected bool $pathStyle = false;
+
+    /**
      * @var array
      */
     protected array $headers = [
@@ -109,7 +114,7 @@ class S3 extends Device
      * @param string $region
      * @param string $acl
      */
-    public function __construct(string $root, string $accessKey, string $secretKey, string $bucket, string $region = self::US_EAST_1, string $acl = self::ACL_PRIVATE)
+    public function __construct(string $root, string $accessKey, string $secretKey, string $bucket, string $region = self::US_EAST_1, string $acl = self::ACL_PRIVATE, bool $pathStyle = false)
     {
         $this->accessKey = $accessKey;
         $this->secretKey = $secretKey;
@@ -117,6 +122,7 @@ class S3 extends Device
         $this->region = $region;
         $this->root = $root;
         $this->acl = $acl;
+        $this->pathStyle = $pathStyle;
         $this->headers['host'] = $this->bucket . '.s3.' . $this->region . '.amazonaws.com';
         $this->amzHeaders = [];
     }
@@ -411,7 +417,8 @@ class S3 extends Device
     private function listObjects($prefix = '', $maxKeys = 1000, $continuationToken = '')
     {
         $uri = '/';
-        $prefix = ltrim($prefix, '/'); /** S3 specific requirement that prefix should never contain a leading slash */ 
+        $prefix = ltrim($prefix, '/');
+        /** S3 specific requirement that prefix should never contain a leading slash */
         $this->headers['content-type'] = 'text/plain';
         $this->headers['content-md5'] = \base64_encode(md5('', true));
 
@@ -609,6 +616,59 @@ class S3 extends Device
      * 
      * @return string
      */
+    private function getSignatureV2(string $method, string $uri, array $parameters = []): string
+    {
+        $combinedHeaders = [];
+
+        // CanonicalHeaders
+        foreach ($this->headers as $k => $v) {
+            $combinedHeaders[\strtolower($k)] = \trim($v);
+        }
+
+        foreach ($this->amzHeaders as $k => $v) {
+            $combinedHeaders[\strtolower($k)] = \trim($v);
+        }
+
+        uksort($combinedHeaders, [&$this, 'sortMetaHeadersCmp']);
+
+        // Convert null query string parameters to strings and sort
+        uksort($parameters, [&$this, 'sortMetaHeadersCmp']);
+        $queryString = \http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
+
+        // Payload
+        $amzPayload = [$method];
+        $amzPayload[] = $this->headers['content-md5']; // 
+        $amzPayload[] = $this->headers['content-type']; //
+        $amzPayload[] = $this->headers['Date']; //$this->amzHeaders['x-amz-date'];
+
+        foreach ($this->amzHeaders as $k => $v) { // add header as string to requests
+            if (\strlen($v) > 0) {
+                $amzPayload[] = \strtolower($k) . ':' . $v;
+            }
+        }
+
+        $qsPos = \strpos($uri, '?');
+        $amzPayload[] = ($qsPos === false ? $uri : \substr($uri, 0, $qsPos));
+
+        //$amzPayload[] = $queryString;//TODO
+
+        // stringToSign
+        $stringToSignStr = \implode(PHP_EOL, $amzPayload);
+        echo $stringToSignStr;
+        echo "\n\r";
+        // Make Signature
+        $signature = \base64_encode(\hash_hmac('sha1', \utf8_encode($stringToSignStr), $this->secretKey, true));
+        return 'AWS ' . $this->accessKey . ':' . $signature;
+    }
+
+    /**
+     * Generate the headers for AWS Signature V4
+     * @param string $method
+     * @param string $uri
+     * @param array parameters
+     * 
+     * @return string
+     */
     private function getSignatureV4(string $method, string $uri, array $parameters = []): string
     {
         $service = 's3';
@@ -692,7 +752,10 @@ class S3 extends Device
     private function call(string $method, string $uri, string $data = '', array $parameters = [])
     {
         $uri = $this->getAbsolutePath($uri);
-        $url = 'https://' . $this->headers['host'] . $uri . '?' . \http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
+        $url = $this->pathStyle ?  'https://' . $this->headers['host'] . "/" . $this->bucket . $uri :
+            'https://' . $this->headers['host'] . $uri . '?' . \http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
+        echo $url . "\n\r";
+        $signatureDate = \gmdate(DATE_RFC1123);
         $response = new \stdClass;
         $response->body = '';
         $response->headers = [];
@@ -704,11 +767,11 @@ class S3 extends Device
 
         // Headers
         $httpHeaders = [];
-        $this->amzHeaders['x-amz-date'] = \gmdate('Ymd\THis\Z');
+        //$this->amzHeaders['x-amz-date'] = $this->pathStyle ? $signatureDate : \gmdate('Ymd\THis\Z');
 
-        if (!isset($this->amzHeaders['x-amz-content-sha256'])) {
-            $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
-        }
+        // if (!isset($this->amzHeaders['x-amz-content-sha256'])) {
+        //     $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
+        // }
 
         foreach ($this->amzHeaders as $header => $value) {
             if (\strlen($value) > 0) {
@@ -716,15 +779,19 @@ class S3 extends Device
             }
         }
 
-        $this->headers['date'] = \gmdate('D, d M Y H:i:s T');
+        $this->headers['Date'] = $this->pathStyle ? $signatureDate : \gmdate('D, d M Y H:i:s T');
         foreach ($this->headers as $header => $value) {
             if (\strlen($value) > 0) {
                 $httpHeaders[] = $header . ': ' . $value;
             }
         }
 
-        $httpHeaders[] = 'Authorization: ' . $this->getSignatureV4($method, $uri, $parameters);
+        $authorizationSignature = $this->pathStyle ? $this->getSignatureV2($method, $uri, $parameters) :
+            $this->getSignatureV4($method, $uri, $parameters);
 
+        $httpHeaders[] = 'Authorization: ' . $authorizationSignature;
+        echo implode("\n", $httpHeaders);
+        echo "End\n";
         \curl_setopt($curl, CURLOPT_HTTPHEADER, $httpHeaders);
         \curl_setopt($curl, CURLOPT_HEADER, false);
         \curl_setopt($curl, CURLOPT_RETURNTRANSFER, false);
@@ -746,7 +813,8 @@ class S3 extends Device
         });
         \curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
         \curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
-
+        if ($this->pathStyle)
+            \curl_setopt($curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         // Request types
         switch ($method) {
             case self::METHOD_PUT:
