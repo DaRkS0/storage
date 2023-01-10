@@ -621,10 +621,10 @@ class S3 extends Device
         $combinedHeaders = [];
         unset($this->amzHeaders['x-amz-content-sha256']);
 
-        if ($method != self::METHOD_PUT && $method != self::METHOD_POST) {
-            unset($this->headers['content-type']);
-            unset($this->headers['Content-MD5']);
-        }
+        // if ($method != self::METHOD_PUT && $method != self::METHOD_POST) {
+        //     unset($this->headers['content-type']);
+        //     unset($this->headers['Content-MD5']);
+        // }
 
         // CanonicalHeaders
         foreach ($this->amzHeaders as $k => $v) {
@@ -636,8 +636,11 @@ class S3 extends Device
         // Payload
         $amzMerged = array();
         $amzPayload = [$method];
-        $amzPayload[] = $this->headers['Content-MD5']; //
-        $amzPayload[] = $this->headers['content-type']; //
+
+        $amzPayload[] = $method != self::METHOD_PUT && $method != self::METHOD_POST ? "" : $this->headers['Content-MD5']; //
+        $amzPayload[] = $method != self::METHOD_PUT && $method != self::METHOD_POST ? "" : $this->headers['content-type']; //
+
+
         $amzPayload[] = $this->headers['Date']; //$this->amzHeaders['x-amz-date'];
         //$amzPayload[] = "";
         foreach ($combinedHeaders as $k => $v) { // add header as string to requests
