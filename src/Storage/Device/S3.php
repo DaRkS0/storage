@@ -618,9 +618,10 @@ class S3 extends Device
      */
     private function getSignatureV2(string $method, string $uri, array $parameters = []): string
     {
+        $amzMerged = array();
         $combinedHeaders = [];
+        $isUploadMethod = $method != self::METHOD_PUT && $method != self::METHOD_POST;
         unset($this->amzHeaders['x-amz-content-sha256']);
-
         // if ($method != self::METHOD_PUT && $method != self::METHOD_POST) {
         //     unset($this->headers['content-type']);
         //     unset($this->headers['Content-MD5']);
@@ -634,11 +635,11 @@ class S3 extends Device
         uksort($combinedHeaders, [&$this, 'sortMetaHeadersCmp']);
 
         // Payload
-        $amzMerged = array();
+
         $amzPayload = [$method];
 
-        $amzPayload[] = $method != self::METHOD_PUT && $method != self::METHOD_POST ? "" : $this->headers['Content-MD5']; //
-        $amzPayload[] = $method != self::METHOD_PUT && $method != self::METHOD_POST ? "" : $this->headers['content-type']; //
+        $amzPayload[] = $isUploadMethod ? "" : $this->headers['Content-MD5']; //
+        $amzPayload[] = $isUploadMethod ? "" : $this->headers['content-type']; //
 
 
         $amzPayload[] = $this->headers['Date']; //$this->amzHeaders['x-amz-date'];
