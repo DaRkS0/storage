@@ -95,7 +95,7 @@ class S3 extends Device
      */
     protected array $headers = [
         'host' => '', 'date' => '',
-        'content-md5' => '',
+        'Content-MD5' => '',
         'content-type' => '',
     ];
 
@@ -210,21 +210,21 @@ class S3 extends Device
 
     /**
      * Start Multipart Upload
-     * 
+     *
      * Initiate a multipart upload and return an upload ID.
-     * 
+     *
      * @param string $path
      * @param string $contentType
-     * 
+     *
      * @throws \Exception
-     * 
+     *
      * @return string
      */
     protected function createMultipartUpload(string $path, string $contentType): string
     {
         $uri = $path !== '' ? '/' . \str_replace(['%2F', '%3F'], ['/', '?'], \rawurlencode($path)) : '/';
 
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        $this->headers['Content-MD5'] = \base64_encode(md5('', true));
         unset($this->amzHeaders['x-amz-content-sha256']);
         $this->headers['content-type'] = $contentType;
         $this->amzHeaders['x-amz-acl'] = $this->acl;
@@ -234,14 +234,14 @@ class S3 extends Device
 
     /**
      * Upload Part
-     * 
+     *
      * @param string $source
      * @param string $path
      * @param int $chunk
      * @param string $uploadId
-     * 
+     *
      * @throws \Exception
-     * 
+     *
      * @return string
      */
     protected function uploadPart(string $source, string $path, int $chunk, string $uploadId): string
@@ -250,7 +250,7 @@ class S3 extends Device
 
         $data = \file_get_contents($source);
         $this->headers['content-type'] = \mime_content_type($source);
-        $this->headers['content-md5'] = \base64_encode(md5($data, true));
+        $this->headers['Content-MD5'] = \base64_encode(md5($data, true));
         $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
         unset($this->amzHeaders['x-amz-acl']); // ACL header is not allowed in parts, only createMultipartUpload accepts this header.
 
@@ -264,13 +264,13 @@ class S3 extends Device
 
     /**
      * Complete Multipart Upload
-     * 
+     *
      * @param string $path
      * @param string $uploadId
      * @param array $parts
-     * 
+     *
      * @throws \Exception
-     * 
+     *
      * @return bool
      */
     protected function completeMultipartUpload(string $path, string $uploadId, array $parts): bool
@@ -284,26 +284,26 @@ class S3 extends Device
         $body .= '</CompleteMultipartUpload>';
 
         $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $body);
-        $this->headers['content-md5'] = \base64_encode(md5($body, true));
+        $this->headers['Content-MD5'] = \base64_encode(md5($body, true));
         $this->call(self::METHOD_POST, $uri, $body, ['uploadId' => $uploadId]);
         return true;
     }
 
     /**
      * Abort Chunked Upload
-     * 
+     *
      * @param string $path
      * @param string $extra
-     * 
+     *
      * @throws \Exception
-     * 
+     *
      * @return bool
      */
     public function abort(string $path, string $extra = ''): bool
     {
         $uri = $path !== '' ? '/' . \str_replace(['%2F', '%3F'], ['/', '?'], \rawurlencode($path)) : '/';
         unset($this->headers['content-type']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        $this->headers['Content-MD5'] = \base64_encode(md5('', true));
         $this->call(self::METHOD_DELETE, $uri, '', ['uploadId' => $extra]);
         return true;
     }
@@ -314,7 +314,7 @@ class S3 extends Device
      * @param string $path
      * @param int offset
      * @param int length
-     * 
+     *
      * @throws \Exception
      *
      * @return string
@@ -324,7 +324,7 @@ class S3 extends Device
         unset($this->amzHeaders['x-amz-acl']);
         unset($this->amzHeaders['x-amz-content-sha256']);
         unset($this->headers['content-type']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        $this->headers['Content-MD5'] = \base64_encode(md5('', true));
         $uri = ($path !== '') ? '/' . \str_replace('%2F', '/', \rawurlencode($path)) : '/';
         if ($length !== null) {
             $end = $offset + $length - 1;
@@ -339,9 +339,9 @@ class S3 extends Device
      *
      * @param string $path
      * @param string $data
-     * 
+     *
      * @throws \Exception
-     * 
+     *
      * @return bool
      */
     public function write(string $path, string $data, string $contentType = ''): bool
@@ -349,9 +349,9 @@ class S3 extends Device
         $uri = $path !== '' ? '/' . \str_replace(['%2F', '%3F'], ['/', '?'], \rawurlencode($path)) : '/';
 
         $this->headers['content-type'] = $contentType;
-        $this->headers['content-md5'] = \base64_encode(md5($data, true)); //TODO whould this work well with big file? can we skip it?
-        $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
-        $this->amzHeaders['x-amz-acl'] = $this->acl;
+        $this->headers['Content-MD5'] = \base64_encode(md5($data, true)); //TODO whould this work well with big file? can we skip it?
+        // $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
+        // $this->amzHeaders['x-amz-acl'] = $this->acl;
 
         $this->call(self::METHOD_PUT, $uri, $data);
 
@@ -365,7 +365,7 @@ class S3 extends Device
      *
      * @param string $source
      * @param string $target
-     * 
+     *
      * @throw \Exception
      *
      * @return bool
@@ -387,7 +387,7 @@ class S3 extends Device
      * @see http://php.net/manual/en/function.filesize.php
      *
      * @param string $path
-     * 
+     *
      * @throws \Exception
      *
      * @return bool
@@ -399,7 +399,7 @@ class S3 extends Device
         unset($this->headers['content-type']);
         unset($this->amzHeaders['x-amz-acl']);
         unset($this->amzHeaders['x-amz-content-sha256']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        $this->headers['Content-MD5'] = \base64_encode(md5('', true));
         $this->call(self::METHOD_DELETE, $uri);
 
         return true;
@@ -409,7 +409,7 @@ class S3 extends Device
      * Get list of objects in the given path.
      *
      * @param string $path
-     * 
+     *
      * @throws \Exception
      *
      * @return array
@@ -420,7 +420,7 @@ class S3 extends Device
         $prefix = ltrim($prefix, '/');
         /** S3 specific requirement that prefix should never contain a leading slash */
         $this->headers['content-type'] = 'text/plain';
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        $this->headers['Content-MD5'] = \base64_encode(md5('', true));
 
         $parameters = [
             'list-type' => 2,
@@ -438,7 +438,7 @@ class S3 extends Device
      * Delete files in given path, path must be a directory. Return true on success and false on failure.
      *
      * @param string $path
-     * 
+     *
      * @throws \Exception
      *
      * @return bool
@@ -467,7 +467,7 @@ class S3 extends Device
             $body .= '<Quiet>true</Quiet>';
             $body .= '</Delete>';
             $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $body);
-            $this->headers['content-md5'] = \base64_encode(md5($body, true));
+            $this->headers['Content-MD5'] = \base64_encode(md5($body, true));
             $this->call(self::METHOD_POST, $uri, $body, ['delete' => '']);
         } while (!empty($continuationToken));
 
@@ -601,7 +601,7 @@ class S3 extends Device
         unset($this->headers['content-type']);
         unset($this->amzHeaders['x-amz-acl']);
         unset($this->amzHeaders['x-amz-content-sha256']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        $this->headers['Content-MD5'] = \base64_encode(md5('', true));
         $uri = $path !== '' ? '/' . \str_replace('%2F', '/', \rawurlencode($path)) : '/';
         $response = $this->call(self::METHOD_HEAD, $uri);
 
@@ -613,44 +613,43 @@ class S3 extends Device
      * @param string $method
      * @param string $uri
      * @param array parameters
-     * 
+     *
      * @return string
      */
     private function getSignatureV2(string $method, string $uri, array $parameters = []): string
     {
         $combinedHeaders = [];
+        unset($this->amzHeaders['x-amz-content-sha256']);
 
-        // CanonicalHeaders
-        foreach ($this->headers as $k => $v) {
-            $combinedHeaders[\strtolower($k)] = \trim($v);
+        if ($method != self::METHOD_PUT && $method != self::METHOD_POST) {
+            unset($this->headers['content-type']);
+            unset($this->headers['Content-MD5']);
         }
 
+        // CanonicalHeaders
         foreach ($this->amzHeaders as $k => $v) {
             $combinedHeaders[\strtolower($k)] = \trim($v);
         }
 
         uksort($combinedHeaders, [&$this, 'sortMetaHeadersCmp']);
 
-        // Convert null query string parameters to strings and sort
-        uksort($parameters, [&$this, 'sortMetaHeadersCmp']);
-        $queryString = \http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
-
         // Payload
+        $amzMerged = array();
         $amzPayload = [$method];
-        $amzPayload[] = $this->headers['content-md5']; // 
+        $amzPayload[] = $this->headers['Content-MD5']; //
         $amzPayload[] = $this->headers['content-type']; //
         $amzPayload[] = $this->headers['Date']; //$this->amzHeaders['x-amz-date'];
-
-        foreach ($this->amzHeaders as $k => $v) { // add header as string to requests
+        //$amzPayload[] = "";
+        foreach ($combinedHeaders as $k => $v) { // add header as string to requests
             if (\strlen($v) > 0) {
-                $amzPayload[] = \strtolower($k) . ':' . $v;
+                $amzMerged[] = \strtolower($k) . ':' . $v;
             }
         }
-
         $qsPos = \strpos($uri, '?');
-        $amzPayload[] = ($qsPos === false ? $uri : \substr($uri, 0, $qsPos));
 
-        //$amzPayload[] = $queryString;//TODO
+        $amzMerged[] = "/" . ($qsPos === false ? $uri : \substr($uri, 0, $qsPos));
+
+        $amzPayload[] = \implode(PHP_EOL, $amzMerged);
 
         // stringToSign
         $stringToSignStr = \implode(PHP_EOL, $amzPayload);
@@ -666,7 +665,7 @@ class S3 extends Device
      * @param string $method
      * @param string $uri
      * @param array parameters
-     * 
+     *
      * @return string
      */
     private function getSignatureV4(string $method, string $uri, array $parameters = []): string
@@ -739,12 +738,12 @@ class S3 extends Device
 
     /**
      * Get the S3 response
-     * 
+     *
      * @param string $method
      * @param string $uri
      * @param string $data
      * @param array $parameters
-     * 
+     *
      * @throws \Exception
      *
      * @return  object
@@ -773,11 +772,11 @@ class S3 extends Device
         //     $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
         // }
 
-        foreach ($this->amzHeaders as $header => $value) {
+        /* foreach ($this->amzHeaders as $header => $value) {
             if (\strlen($value) > 0) {
                 $httpHeaders[] = $header . ': ' . $value;
             }
-        }
+        }*/
 
         $this->headers['Date'] = $this->pathStyle ? $signatureDate : \gmdate('D, d M Y H:i:s T');
         foreach ($this->headers as $header => $value) {
@@ -786,12 +785,13 @@ class S3 extends Device
             }
         }
 
-        $authorizationSignature = $this->pathStyle ? $this->getSignatureV2($method, $uri, $parameters) :
+        $authorizationSignature = $this->pathStyle ? $this->getSignatureV2($method, $this->bucket . $uri, $parameters) :
             $this->getSignatureV4($method, $uri, $parameters);
 
         $httpHeaders[] = 'Authorization: ' . $authorizationSignature;
         echo implode("\n", $httpHeaders);
-        echo "End\n";
+
+        echo "End\n\n\n";
         \curl_setopt($curl, CURLOPT_HTTPHEADER, $httpHeaders);
         \curl_setopt($curl, CURLOPT_HEADER, false);
         \curl_setopt($curl, CURLOPT_RETURNTRANSFER, false);
